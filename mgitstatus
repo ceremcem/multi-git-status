@@ -185,11 +185,23 @@ containsElement () {
   return 1
 }
 
+# alternative to realpath for macOS
+my_realpath() {
+    [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+}
+
 # Go through positional arguments (DIRs) or '.' if no argumnets are given
 for DIR in "${args[@]:-"."}"; do
     # We *want* to expand parameters, so disable shellcheck for this error:
     # shellcheck disable=SC2086
-    readarray -d '' PROJ_DIRS < <(find -L "$DIR" $FIND_OPTS -depth -name ".git" -printf "%h\0" )
+    INITIAL_DIRS_LINES=$(find -L "$DIR" $FIND_OPTS -depth -name ".git" | LC_ALL=C sort -n)
+
+    # Expand lines of string into an array
+    PROJ_DIRS=()
+    while read -r PROJ_DIR; do
+        PROJ_DIRS+=( "${PROJ_DIR%"/.git"}" ) # add dir removing /.git
+    done <<< "$(echo -e "$INITIAL_DIRS_LINES")"
+
     [ $INFO_OUTPUT -eq 1 ] && \
         1>&2 echo "INFO: Examining ${#PROJ_DIRS[@]} git folders recursively..."
     PROJ_NEED_ATTENTION=0
@@ -206,7 +218,7 @@ for DIR in "${args[@]:-"."}"; do
             # This is a submodule 
             IS_SUBMODULE="yes"
             BARE_DIR="$(cat "$PROJ_DIR/.git" | awk '{print $2}')"
-            GIT_DIR="$(realpath "$PROJ_DIR/$BARE_DIR")"
+            GIT_DIR="$(my_realpath "$PROJ_DIR/$BARE_DIR")"
         fi
         GIT_CONF="$GIT_DIR/config"
 
@@ -241,7 +253,7 @@ for DIR in "${args[@]:-"."}"; do
         git --work-tree "$PROJ_DIR" --git-dir "$GIT_DIR" update-index -q --refresh >/dev/null 2>&1
 
         # Now we know we are dealing with a git repo. Find out its submodules:
-        SUBMODULES=($(cd "$PROJ_DIR"; git config --file=.gitmodules --get-regexp ^^submodule.*\.path$ | cut -d " " -f 2))
+        SUBMODULES=($(cd "$PROJ_DIR"; git config --file=.gitmodules --get-regexp "^^submodule.*\.path$" | cut -d " " -f 2))
         if [[ ! -z $SUBMODULES ]]; then 
             #printf ' | Submodule: %s\n' "${SUBMODULES[@]}"
             j=0
@@ -355,7 +367,7 @@ for DIR in "${args[@]:-"."}"; do
         if [ "$STASHES" -ne 0 ] && [ "$NO_STASHES" -eq 0 ]; then
             STATUS_NEEDS="${STATUS_NEEDS}${C_STASHES}$STASHES stashes${C_RESET} "
         fi
-        STALLED_COUNT=$(echo $STALLED | tr ',' ' ' | wc -w)
+        STALLED_COUNT=$(echo $STALLED | tr ',' ' ' | wc -w | xargs)
         if [ "$STALLED_COUNT" -ne 0 ] && [[ "$BNAME" != "HEAD" ]] && [ -z "$NO_STALLED" ]; then
             STATUS_NEEDS="${STATUS_NEEDS}${C_STALLED}${STALLED_COUNT} stalled ($STALLED)${C_RESET} "
             ## dump the commit logs which only the other branches have
