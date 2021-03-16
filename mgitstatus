@@ -194,7 +194,7 @@ my_realpath() {
 for DIR in "${args[@]:-"."}"; do
     # We *want* to expand parameters, so disable shellcheck for this error:
     # shellcheck disable=SC2086
-    INITIAL_DIRS_LINES=$(find -L "$DIR" $FIND_OPTS -depth -name ".git")
+    INITIAL_DIRS_LINES=$(find -L "$DIR" $FIND_OPTS -depth -name ".git" | LC_ALL=C sort -n)
 
     # Expand lines of string into an array
     PROJ_DIRS=()
@@ -367,7 +367,7 @@ for DIR in "${args[@]:-"."}"; do
         if [ "$STASHES" -ne 0 ] && [ "$NO_STASHES" -eq 0 ]; then
             STATUS_NEEDS="${STATUS_NEEDS}${C_STASHES}$STASHES stashes${C_RESET} "
         fi
-        STALLED_COUNT=$(echo $STALLED | tr ',' ' ' | wc -w)
+        STALLED_COUNT=$(echo $STALLED | tr ',' ' ' | wc -w | xargs)
         if [ "$STALLED_COUNT" -ne 0 ] && [[ "$BNAME" != "HEAD" ]] && [ -z "$NO_STALLED" ]; then
             STATUS_NEEDS="${STATUS_NEEDS}${C_STALLED}${STALLED_COUNT} stalled ($STALLED)${C_RESET} "
             ## dump the commit logs which only the other branches have
