@@ -194,11 +194,13 @@ my_realpath() {
 for DIR in "${args[@]:-"."}"; do
     # We *want* to expand parameters, so disable shellcheck for this error:
     # shellcheck disable=SC2086
+    INITIAL_DIRS_LINES=$(find -L "$DIR" $FIND_OPTS -depth -name ".git")
 
+    # Expand lines of string into an array
     PROJ_DIRS=()
     while read -r PROJ_DIR; do
         PROJ_DIRS+=( "${PROJ_DIR%"/.git"}" ) # add dir removing /.git
-    done <<< "$(find -L "$DIR" $FIND_OPTS -depth -name ".git")"
+    done <<< "$(echo -e "$INITIAL_DIRS_LINES")"
 
     [ $INFO_OUTPUT -eq 1 ] && \
         1>&2 echo "INFO: Examining ${#PROJ_DIRS[@]} git folders recursively..."
